@@ -1,0 +1,449 @@
+<title>Date Crew Profile Checker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: slim brand bar and tab nav above a two-column workspace (candidate queue | check result) that stacks on phones */
+:root{
+  --bg:#f8f7f9; --surface:#ffffff; --fg:#1d1a22; --muted:#6a6573; --line:#e4e0e9;
+  --accent:#9b1c46; --accent-fg:#ffffff; --accent-soft:#f6e6ec;
+  --ok:#17673f; --ok-bg:#e3f3ea; --warn:#8a5300; --warn-bg:#fcefd3; --bad:#a8231b; --bad-bg:#fbe5e3;
+  --font-display:'Bricolage Grotesque',system-ui,sans-serif; --font-body:'Inter',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#16131a; --surface:#1f1b25; --fg:#f0edf3; --muted:#a49eaf; --line:#332e3c;
+  --accent:#e0658b; --accent-fg:#1a0b11; --accent-soft:#3a1d29;
+  --ok:#6fd09b; --ok-bg:#16301f; --warn:#f0b75a; --warn-bg:#35280f; --bad:#ff8f86; --bad-bg:#3a1917; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#16131a; --surface:#1f1b25; --fg:#f0edf3; --muted:#a49eaf; --line:#332e3c;
+  --accent:#e0658b; --accent-fg:#1a0b11; --accent-soft:#3a1d29;
+  --ok:#6fd09b; --ok-bg:#16301f; --warn:#f0b75a; --warn-bg:#35280f; --bad:#ff8f86; --bad-bg:#3a1917; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;
+  padding-block:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1080px;margin:0 auto;padding-block:20px 48px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:22px} h2{font-size:18px} h3{font-size:15px}
+.top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.brand{display:flex;flex-direction:column;gap:2px;min-width:0}
+.brand small{color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--muted);background:var(--surface)}
+nav{display:flex;gap:4px;overflow-x:auto;margin:18px 0 20px;border-bottom:1px solid var(--line)}
+nav a{padding:9px 14px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap;font-weight:500}
+nav a[aria-current="page"]{color:var(--fg);border-bottom-color:var(--accent)}
+nav a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;gap:16px}
+.cols{grid-template-columns:minmax(0,300px) minmax(0,1fr);align-items:start}
+.tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.two{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+@media (max-width:760px){.cols{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.tile .n{font-family:var(--font-display);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.tile .l{color:var(--muted);font-size:12px}
+.muted{color:var(--muted)} .small{font-size:12px}
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.between{justify-content:space-between}
+label{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px}
+select,input[type=text],input[type=number],textarea{width:100%;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+textarea{min-height:76px;resize:vertical}
+button{font:inherit;font-weight:600;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 14px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+button.danger{color:var(--bad)}
+button.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.badge{display:inline-flex;align-items:center;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap}
+.ok{background:var(--ok-bg);color:var(--ok)} .warn{background:var(--warn-bg);color:var(--warn)} .bad{background:var(--bad-bg);color:var(--bad)}
+.badge.muted{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.queue{display:flex;flex-direction:column;gap:8px}
+.cand{display:flex;flex-direction:column;gap:6px;text-align:left;width:100%;font-weight:500}
+.cand[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.cand .nm{font-weight:600}
+.verdict{border-left:4px solid var(--line);padding:12px 14px;border-radius:8px;background:var(--bg)}
+.verdict.ok{border-left-color:var(--ok)} .verdict.warn{border-left-color:var(--warn)} .verdict.bad{border-left-color:var(--bad)}
+.verdict .t{font-family:var(--font-display);font-size:17px;font-weight:700}
+.verdict.ok .t{color:var(--ok)} .verdict.warn .t{color:var(--warn)} .verdict.bad .t{color:var(--bad)}
+.verdict.ok,.verdict.warn,.verdict.bad{background:var(--bg)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:520px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+td.num,th.num{font-variant-numeric:tabular-nums;text-align:right}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;background:var(--bg)}
+.chip.deal{border-color:var(--accent);color:var(--accent)}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 90px;gap:10px;align-items:center;font-variant-numeric:tabular-nums}
+.bar .track{height:10px;background:var(--bg);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.bar .fill{height:100%;background:var(--accent)}
+@media (max-width:520px){.bar{grid-template-columns:110px minmax(0,1fr) 70px}}
+.warnbox{border:1px solid var(--bad);background:var(--bad-bg);color:var(--bad);border-radius:8px;padding:10px 12px;font-size:13px}
+.prefrow{display:grid;grid-template-columns:130px 150px minmax(0,1fr);gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+@media (max-width:620px){.prefrow{grid-template-columns:minmax(0,1fr)}}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;max-width:90vw}
+#toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+
+<div class="wrap"><div id="app"></div></div>
+<div id="toast" role="status"></div>
+
+<script>
+// ==ENGINE START==
+// Rule-based checker. No AI decides a deal-breaker: every result below comes from a visible rule.
+var EDU_RANK={"High school":1,"Bachelor's":2,"Master's":3,"Doctorate":4};
+var LABELS={smoking:'Smoking',children:'Wants children',drinking:'Drinking',diet:'Diet',location:'Location',education:'Education',age:'Age'};
+var ORDER=['smoking','children','drinking','diet','location','education','age'];
+
+function wantText(key,v){
+  switch(key){
+    case 'smoking': return 'Non-smoker';
+    case 'drinking': return 'Does not drink';
+    case 'children': return 'Willing to have children';
+    case 'diet': return v==='veg-or-egg'?'Vegetarian or eggetarian':'Vegetarian';
+    case 'location': return (v||[]).join(', ')||'Not specified';
+    case 'education': return (v||"Bachelor's")+' or higher';
+    case 'age': return v.min+' to '+v.max+' years';
+  }
+}
+function haveText(key,c){
+  switch(key){
+    case 'smoking': return c.smoking==null?'Not provided':({no:'Non-smoker',occasionally:'Smokes occasionally',yes:'Smokes'})[c.smoking];
+    case 'drinking': return c.drinking==null?'Not provided':({never:'Never',social:'Socially',regular:'Regularly'})[c.drinking];
+    case 'children': return c.children==null?'Not provided':({yes:'Willing',open:'Open to it',no:'Not willing'})[c.children];
+    case 'diet': return c.diet==null?'Not provided':({vegetarian:'Vegetarian',eggetarian:'Eggetarian','non-vegetarian':'Non-vegetarian'})[c.diet];
+    case 'location': return c.city==null?'Not provided':c.city+(c.relocate?' (open to relocating)':'');
+    case 'education': return c.education==null?'Not provided':c.education;
+    case 'age': return c.age==null?'Not provided':c.age+' years';
+  }
+}
+function judge(key,v,c){
+  switch(key){
+    case 'smoking': if(c.smoking==null)return 'unknown'; return c.smoking==='no'?'match':c.smoking==='occasionally'?'partial':'mismatch';
+    case 'drinking': if(c.drinking==null)return 'unknown'; return c.drinking==='never'?'match':c.drinking==='social'?'partial':'mismatch';
+    case 'children': if(c.children==null)return 'unknown'; return c.children==='yes'?'match':c.children==='open'?'partial':'mismatch';
+    case 'diet':
+      if(c.diet==null)return 'unknown';
+      if(c.diet==='vegetarian')return 'match';
+      if(c.diet==='eggetarian')return v==='veg-or-egg'?'match':'partial';
+      return 'mismatch';
+    case 'location':
+      if(c.city==null)return 'unknown';
+      if((v||[]).some(function(x){return x.toLowerCase()===c.city.toLowerCase()}))return 'match';
+      return c.relocate===true?'partial':'mismatch';
+    case 'education':
+      if(c.education==null)return 'unknown';
+      var need=EDU_RANK[v||"Bachelor's"], have=EDU_RANK[c.education];
+      return have>=need?'match':have===need-1?'partial':'mismatch';
+    case 'age':
+      if(c.age==null)return 'unknown';
+      if(c.age>=v.min&&c.age<=v.max)return 'match';
+      return (c.age>=v.min-2&&c.age<=v.max+2)?'partial':'mismatch';
+  }
+}
+function names(rs){return rs.map(function(r){return r.label.toLowerCase()}).join(', ')}
+function evaluate(client,cand){
+  var rows=[];
+  ORDER.forEach(function(key){
+    var p=client.prefs[key]; if(!p||p.level==='off')return;
+    rows.push({key:key,label:LABELS[key],level:p.level,want:wantText(key,p.value),have:haveText(key,cand),result:judge(key,p.value,cand)});
+  });
+  var deal=rows.filter(function(r){return r.level==='deal'}), soft=rows.filter(function(r){return r.level==='pref'});
+  var dBad=deal.filter(function(r){return r.result==='mismatch'});
+  var dOpen=deal.filter(function(r){return r.result==='partial'||r.result==='unknown'});
+  var sBad=soft.filter(function(r){return r.result==='mismatch'});
+  var status = dBad.length?'conflict':(dOpen.length||sBad.length)?'review':'match';
+  var ok=rows.filter(function(r){return r.result==='match'});
+  var s;
+  if(status==='conflict'){
+    s='Conflicts with '+(dBad.length>1?'stated deal-breakers':'a stated deal-breaker')+': '+names(dBad)+'.';
+    if(ok.length)s+=' Matches on '+names(ok)+'.';
+    s+=' Review before sharing.';
+  } else if(status==='review'){
+    var parts=[];
+    var unk=dOpen.filter(function(r){return r.result==='unknown'}), par=dOpen.filter(function(r){return r.result==='partial'});
+    if(unk.length)parts.push('information is missing for deal-breaker '+names(unk));
+    if(par.length)parts.push('deal-breaker '+names(par)+' only partly matches');
+    if(sBad.length)parts.push('preferred '+names(sBad)+' does not match');
+    s='No deal-breaker is violated, but '+parts.join('; ')+'. A matchmaker should decide.';
+  } else {
+    s='Meets every stated deal-breaker.';
+    var sw=soft.filter(function(r){return r.result==='partial'||r.result==='unknown'});
+    if(sw.length)s+=' Preferred '+names(sw)+' is partial or unavailable, which does not block sharing.';
+  }
+  var scored=soft.filter(function(r){return r.result!=='unknown'});
+  var score=scored.length?Math.round(100*scored.reduce(function(a,r){return a+(r.result==='match'?1:r.result==='partial'?.5:0)},0)/scored.length):null;
+  return {status:status,rows:rows,summary:s,softScore:score};
+}
+
+var PREF_KEYS=['smoking','drinking','children','location','education','age','diet'];
+var RULES=[
+  ['smoking',/\b(smok\w*|cigarett\w*|tobacco|vap(e|ing))\b/i],
+  ['drinking',/\b(drink\w*|alcohol\w*|liquor|booz\w*)\b/i],
+  ['children',/\b(kids?|child(ren)?|babies|baby|parenthood)\b/i],
+  ['location',/\b(reloc\w*|far away|distance|lives? in|city|location|abroad)\b/i],
+  ['education',/\b(educat\w*|degree|qualification\w*|college)\b/i],
+  ['age',/\b(older|younger|age gap|too old|too young|age)\b/i],
+  ['diet',/(non-?veg\w*|\bveg(etarian)?\b|\bmeat\b|\bdiet\b|\beggs?\b)/i],
+  ['appearance',/\b(looks?|photos?|appearance|height|attractive|weight)\b/i],
+  ['career',/\b(job|salary|income|career|profession|earns?)\b/i],
+  ['family',/\b(family|parents|joint family|background)\b/i],
+  ['lifestyle',/\blifestyle\b/i],
+  ['chemistry',/\b(vibe|chemistry|personality|interests?|conversation|spark)\b/i]
+];
+function analyse(text){
+  var hits=RULES.filter(function(r){return r[1].test(text)}).map(function(r){return r[0]});
+  var firm=hits.filter(function(k){return k!=='lifestyle'});
+  var primary=firm.length?firm[0]:(hits.length?'lifestyle':'other');
+  return {text:text,detected:hits,category:primary};
+}
+function classify(category,client){
+  if(PREF_KEYS.indexOf(category)===-1)
+    return {status:'not-captured',note:'Not a field in the preference form. Consider capturing it.',avoidable:false};
+  var p=client.prefs[category];
+  if(p&&p.level==='deal')return {status:'stated-deal',note:'Client already stated this as a deal-breaker. Avoidable rejection.',avoidable:true};
+  if(p&&p.level==='pref')return {status:'stated-pref',note:'Client already stated this as a preference. Avoidable rejection.',avoidable:true};
+  return {status:'not-set',note:'Client left this preference unset. Ask and record it.',avoidable:false};
+}
+// ==ENGINE END==
+
+var KEY='dc-profile-checker-v1';
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]})}
+
+function seed(){
+  var now=Date.now(), h=3600000;
+  var clients=[
+    {id:'C1',name:'Ananya Rao',prefs:{
+      smoking:{level:'deal',value:'no'},children:{level:'deal',value:'yes'},
+      location:{level:'deal',value:['Delhi','Gurugram','Noida']},
+      drinking:{level:'pref',value:'never'},education:{level:'pref',value:"Master's"},
+      age:{level:'pref',value:{min:29,max:34}},diet:{level:'off',value:'vegetarian'}}},
+    {id:'C2',name:'Rohan Mehta',prefs:{
+      age:{level:'deal',value:{min:26,max:31}},diet:{level:'deal',value:'vegetarian'},drinking:{level:'deal',value:'never'},
+      location:{level:'pref',value:['Mumbai','Pune']},education:{level:'pref',value:"Bachelor's"},
+      children:{level:'pref',value:'yes'},smoking:{level:'off',value:'no'}}},
+    {id:'C3',name:'Meera Iyer',prefs:{
+      children:{level:'deal',value:'yes'},education:{level:'deal',value:"Master's"},
+      location:{level:'pref',value:['Bengaluru','Hyderabad']},smoking:{level:'pref',value:'no'},
+      age:{level:'pref',value:{min:30,max:36}},drinking:{level:'off',value:'never'},diet:{level:'off',value:'vegetarian'}}}
+  ];
+  var candidates=[
+    {id:'P101',name:'Kabir Malhotra',age:32,city:'Delhi',smoking:'no',drinking:'never',children:'yes',education:"Master's",diet:'vegetarian',relocate:false,job:'Product designer'},
+    {id:'P102',name:'Dev Arora',age:31,city:'Delhi',smoking:'no',drinking:'social',children:'no',education:"Master's",diet:'non-vegetarian',relocate:false,job:'Consultant'},
+    {id:'P103',name:'Rahul Khanna',age:33,city:'Gurugram',smoking:null,drinking:'social',children:'yes',education:"Bachelor's",diet:'vegetarian',relocate:false,job:'Founder'},
+    {id:'P104',name:'Vikram Sethi',age:38,city:'Noida',smoking:'no',drinking:'never',children:'yes',education:"Master's",diet:'vegetarian',relocate:false,job:'Surgeon'},
+    {id:'P105',name:'Arjun Bhatia',age:28,city:'Mumbai',smoking:'no',drinking:'never',children:'yes',education:"Bachelor's",diet:'vegetarian',relocate:false,job:'Architect'},
+    {id:'P106',name:'Nikhil Desai',age:34,city:'Pune',smoking:'no',drinking:'never',children:'open',education:"Master's",diet:'vegetarian',relocate:true,job:'Data scientist'},
+    {id:'P107',name:'Karan Joshi',age:30,city:'Pune',smoking:'occasionally',drinking:'social',children:'yes',education:"Master's",diet:'eggetarian',relocate:false,job:'Chartered accountant'},
+    {id:'P108',name:'Aditya Menon',age:33,city:'Bengaluru',smoking:'no',drinking:'never',children:'yes',education:'Doctorate',diet:null,relocate:false,job:'Researcher'},
+    {id:'P109',name:'Sameer Kapoor',age:35,city:'Hyderabad',smoking:'no',drinking:'social',children:'yes',education:"Bachelor's",diet:'vegetarian',relocate:false,job:'Entrepreneur'},
+    {id:'P110',name:'Tanmay Rao',age:29,city:'Chennai',smoking:'yes',drinking:'social',children:null,education:"Master's",diet:'non-vegetarian',relocate:true,job:'Engineer'}
+  ];
+  var history=[
+    {id:'H1',at:now-26*h,clientId:'C1',clientName:'Ananya Rao',candId:'P102',candName:'Dev Arora',status:'conflict',decision:'reject',reason:'Candidate does not want children; client deal-breaker.'},
+    {id:'H2',at:now-25*h,clientId:'C1',clientName:'Ananya Rao',candId:'P101',candName:'Kabir Malhotra',status:'match',decision:'approve',reason:'All deal-breakers met; shared by email.'},
+    {id:'H3',at:now-8*h,clientId:'C2',clientName:'Rohan Mehta',candId:'P107',candName:'Karan Joshi',status:'review',decision:'review',reason:'Diet and drinking partial. Asking client how flexible he is.'},
+    {id:'H4',at:now-6*h,clientId:'C2',clientName:'Rohan Mehta',candId:'P105',candName:'Arjun Bhatia',status:'match',decision:'approve',reason:'Clean match on all stated preferences.'}
+  ];
+  var fb=[
+    ['I prefer someone who does not smoke.','smoking','C1','stated-deal'],
+    ['Too far, I do not want to relocate.','location','C3','stated-pref'],
+    ['Not vegetarian, we eat very differently.','diet','C2','stated-deal'],
+    ['Did not like the photos.','appearance','C1','not-captured'],
+    ['Family background is not similar to ours.','family','C3','not-captured'],
+    ['Salary seems lower than I expected.','career','C1','not-captured'],
+    ['He drinks regularly.','drinking','C2','stated-deal'],
+    ['Conversation felt flat on the call.','chemistry','C3','not-captured'],
+    ['Seems too old for me.','age','C3','stated-pref'],
+    ['Want someone more career focused.','career','C2','not-captured'],
+    ['Lifestyle is not a match.','lifestyle','C1','not-captured'],
+    ['Height is shorter than I want.','appearance','C2','not-captured']
+  ].map(function(r,i){return {id:'F'+i,at:now-(60+i*5)*h,clientId:r[2],text:r[0],category:r[1],status:r[3],demo:true}});
+  return {clients:clients,candidates:candidates,history:history,feedback:fb};
+}
+
+var state=load()||seed();
+function load(){try{var r=localStorage.getItem(KEY);return r?JSON.parse(r):null}catch(e){return null}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+var ui={view:'overview',clientId:'C1',candId:'P101',pending:null,reason:'',ack:false,draft:null,fbText:'',fbResult:null,fbCand:''};
+
+function client(id){return state.clients.find(function(c){return c.id===(id||ui.clientId)})}
+function cand(id){return state.candidates.find(function(c){return c.id===(id||ui.candId)})}
+function fmt(t){return new Date(t).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+var ST={match:['Matches stated preferences','ok'],review:['Needs matchmaker review','warn'],conflict:['Conflicts with deal-breaker','bad']};
+var DEC={approve:'Approved for sharing',review:'Sent for review',reject:'Do not share'};
+var CATS=['smoking','drinking','children','location','education','age','diet','appearance','career','family','lifestyle','chemistry','other'];
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(function(){t.classList.remove('show')},2200)}
+function badge(st){return '<span class="badge '+ST[st][1]+'">'+ST[st][0]+'</span>'}
+function clientSelect(id){
+  return '<label for="'+id+'">Client</label><select id="'+id+'" data-bind="client">'+state.clients.map(function(c){return '<option value="'+c.id+'"'+(c.id===ui.clientId?' selected':'')+'>'+esc(c.name)+' ('+c.id+')</option>'}).join('')+'</select>';
+}
+function prefChips(c){
+  var out=[];
+  ORDER.forEach(function(k){var p=c.prefs[k]; if(!p||p.level==='off')return;
+    out.push('<span class="chip'+(p.level==='deal'?' deal':'')+'">'+(p.level==='deal'?'Deal-breaker · ':'Preferred · ')+esc(LABELS[k])+': '+esc(wantText(k,p.value))+'</span>')});
+  return '<div class="chips">'+out.join('')+'</div>';
+}
+
+var views={};
+views.overview=function(){
+  var h=state.history, n=h.length;
+  function cnt(s){return h.filter(function(x){return x.status===s}).length}
+  var fb=state.feedback, av=fb.filter(function(f){return f.status==='stated-deal'||f.status==='stated-pref'}).length;
+  var rate=fb.length?Math.round(100*av/fb.length):0;
+  var f=[['Profiles shared',1000],['Profiles accepted',310],['Contact details shared',210],['Conversations started',150],['Meetings fixed',75],['Meetings completed',42]];
+  return '<div class="stack">'
+  +'<div class="grid tiles">'
+  +'<div class="card tile"><div class="n">'+n+'</div><div class="l">Checks recorded (demo)</div></div>'
+  +'<div class="card tile"><div class="n">'+cnt('match')+'</div><div class="l">Matched stated preferences</div></div>'
+  +'<div class="card tile"><div class="n">'+cnt('review')+'</div><div class="l">Needed review</div></div>'
+  +'<div class="card tile"><div class="n">'+cnt('conflict')+'</div><div class="l">Conflicted with a deal-breaker</div></div>'
+  +'<div class="card tile"><div class="n">'+rate+'%</div><div class="l">Demo rejections already covered by stated preferences</div></div>'
+  +'</div>'
+  +'<div class="grid two">'
+  +'<div class="card stack"><h2>Where the funnel leaks</h2><div class="small muted">Figures from the assessment brief, last 30 days. Not generated by this tool.</div>'
+  +f.map(function(r,i){var pc=(r[1]/10); var step=i?Math.round(100*r[1]/f[i-1][1])+'% of prev.':'';return '<div class="bar"><span>'+r[0]+'</span><span class="track"><span class="fill" style="display:block;width:'+pc+'%"></span></span><span class="small muted" style="text-align:right">'+r[1].toLocaleString('en-IN')+' · '+step+'</span></div>'}).join('')
+  +'<div class="small">35% of the 690 rejections is about 241 profiles, or <b>24% of everything shared</b>, rejected for something the client had already told us.</div></div>'
+  +'<div class="card stack"><h2>Recent checks</h2>'
+  +(n?'<div class="stack">'+h.slice().sort(function(a,b){return b.at-a.at}).slice(0,5).map(function(x){return '<div class="row between"><div><b>'+esc(x.candName)+'</b> for '+esc(x.clientName)+'<div class="small muted">'+DEC[x.decision]+' · '+fmt(x.at)+'</div></div>'+badge(x.status)+'</div>'}).join('')+'</div>':'<div class="muted">No checks yet. Open Check profiles to start.</div>')
+  +'<div><a href="#checker"><button class="primary" type="button">Check a profile</button></a></div></div>'
+  +'</div></div>';
+};
+
+views.checker=function(){
+  var c=client(), cd=cand(), res=evaluate(c,cd);
+  var queue=state.candidates.map(function(p){var r=evaluate(c,p);
+    return '<button type="button" class="cand" data-act="pick" data-id="'+p.id+'" aria-pressed="'+(p.id===ui.candId)+'"><span class="nm">'+esc(p.name)+' <span class="muted small">'+p.id+'</span></span><span class="small muted">'+p.age+' · '+esc(p.city)+' · '+esc(p.job)+'</span>'+badge(r.status)+'</button>'}).join('');
+  var rows=res.rows.map(function(r){
+    var rr=r.result, label=rr==='unknown'&&r.level==='deal'?'Information unavailable – review required':({match:'Match',partial:'Partial match',mismatch:'Mismatch',unknown:'Information unavailable'})[rr];
+    var cls=rr==='match'?'ok':rr==='mismatch'?'bad':rr==='partial'?'warn':(r.level==='deal'?'warn':'muted');
+    return '<tr><td><b>'+esc(r.label)+'</b></td><td>'+(r.level==='deal'?'Deal-breaker':'Preferred')+'</td><td>'+esc(r.want)+'</td><td>'+esc(r.have)+'</td><td><span class="badge '+cls+'">'+label+'</span></td></tr>'}).join('');
+  var last=state.history.filter(function(x){return x.clientId===c.id&&x.candId===cd.id}).sort(function(a,b){return b.at-a.at})[0];
+  var pend='';
+  if(ui.pending){
+    var warn=res.status==='conflict'&&ui.pending==='approve';
+    pend='<div class="stack"><div><b>'+DEC[ui.pending]+'</b> · record your reason</div>'
+    +(warn?'<div class="warnbox">Warning: this profile conflicts with a stated deal-breaker. Approve only if the client has told you the deal-breaker is flexible.</div>':'')
+    +'<div><label for="reason">Reason (required)</label><textarea id="reason" data-bind="reason">'+esc(ui.reason)+'</textarea></div>'
+    +(warn?'<label style="display:flex;gap:8px;align-items:center;font-weight:500;color:var(--fg)"><input type="checkbox" id="ack" data-bind="ack"'+(ui.ack?' checked':'')+'> I understand and want to approve anyway</label>':'')
+    +'<div class="row"><button class="primary" type="button" data-act="confirm">Save decision</button><button class="ghost" type="button" data-act="cancel">Cancel</button></div></div>';
+  }
+  return '<div class="stack"><div class="grid cols"><div class="stack"><div class="card stack">'+clientSelect('sel-client')+prefChips(c)+'</div>'
+  +'<div class="card stack"><h3>Candidate queue</h3><div class="queue">'+queue+'</div><div class="small muted">Status shown is for '+esc(c.name)+'. Switch client to re-check the same people.</div></div></div>'
+  +'<div class="stack"><div class="card stack"><div class="row between"><div><h2>'+esc(cd.name)+'</h2><div class="small muted">'+cd.id+' · '+cd.age+' · '+esc(cd.city)+' · '+esc(cd.job)+'</div></div></div>'
+  +'<div class="verdict '+ST[res.status][1]+'"><div class="t">'+ST[res.status][0]+'</div><div>'+esc(res.summary)+'</div>'+(res.softScore!=null?'<div class="small muted" style="margin-top:6px">Preferred-characteristics fit: '+res.softScore+'% (match = 1, partial = 0.5, unavailable excluded)</div>':'')+'</div>'
+  +'<div class="tablewrap"><table><thead><tr><th>Preference</th><th>Type</th><th>Client wants</th><th>Candidate has</th><th>Result</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+  +'<div class="small muted">Rules only. No AI infers anything about the candidate. Missing data is never treated as a match.</div></div>'
+  +'<div class="card stack"><h3>Your decision</h3>'
+  +(last?'<div class="small muted">Last recorded: '+DEC[last.decision]+' · '+fmt(last.at)+' · “'+esc(last.reason)+'”</div>':'')
+  +(ui.pending?pend:'<div class="row"><button class="primary" type="button" data-act="decide" data-d="approve">Approve for sharing</button><button type="button" data-act="decide" data-d="review">Send for further review</button><button class="danger" type="button" data-act="decide" data-d="reject">Do not share</button></div>')
+  +'</div></div></div></div>';
+};
+
+function ensureDraft(){if(!ui.draft||ui.draft.id!==ui.clientId)ui.draft={id:ui.clientId,prefs:clone(client().prefs)}}
+views.clients=function(){
+  ensureDraft(); var d=ui.draft.prefs;
+  var fixed={smoking:'Non-smoker',drinking:'Does not drink',children:'Willing to have children'};
+  var rows=ORDER.map(function(k){
+    var p=d[k]||{level:'off',value:k==='location'?[]:k==='age'?{min:25,max:35}:k==='education'?"Bachelor's":k==='diet'?'vegetarian':({smoking:'no',drinking:'never',children:'yes'})[k]};
+    var v;
+    if(fixed[k])v='<span class="muted">'+fixed[k]+'</span>';
+    else if(k==='diet')v='<select id="v-diet" data-bind="val" data-k="diet"><option value="vegetarian"'+(p.value==='vegetarian'?' selected':'')+'>Vegetarian</option><option value="veg-or-egg"'+(p.value==='veg-or-egg'?' selected':'')+'>Vegetarian or eggetarian</option></select>';
+    else if(k==='education')v='<select id="v-edu" data-bind="val" data-k="education">'+Object.keys(EDU_RANK).map(function(e){return '<option'+(p.value===e?' selected':'')+'>'+e+'</option>'}).join('')+'</select>';
+    else if(k==='location')v='<input type="text" id="v-loc" data-bind="val" data-k="location" value="'+esc((p.value||[]).join(', '))+'" aria-label="Cities, comma separated" placeholder="Cities, comma separated">';
+    else v='<div class="row"><input type="number" id="v-amin" data-bind="val" data-k="ageMin" value="'+p.value.min+'" aria-label="Minimum age" style="width:90px"> to <input type="number" id="v-amax" data-bind="val" data-k="ageMax" value="'+p.value.max+'" aria-label="Maximum age" style="width:90px"></div>';
+    return '<div class="prefrow"><b>'+LABELS[k]+'</b><select id="l-'+k+'" data-bind="level" data-k="'+k+'" aria-label="'+LABELS[k]+' importance"><option value="deal"'+(p.level==='deal'?' selected':'')+'>Deal-breaker</option><option value="pref"'+(p.level==='pref'?' selected':'')+'>Preferred</option><option value="off"'+(p.level==='off'?' selected':'')+'>Not set</option></select><div>'+v+'</div></div>'}).join('');
+  return '<div class="card stack" style="max-width:760px"><h2>Client preferences</h2>'+clientSelect('sel-client')
+  +'<div class="small muted">Deal-breakers must be met. Preferred items can be flexible. Saved changes apply to every check straight away.</div>'+rows
+  +'<div class="row"><button class="primary" type="button" data-act="savePrefs">Save preferences</button><button class="ghost" type="button" data-act="revertPrefs">Discard changes</button></div></div>';
+};
+
+views.feedback=function(){
+  var c=client(), r=ui.fbResult, fb=state.feedback;
+  var av=fb.filter(function(f){return f.status==='stated-deal'||f.status==='stated-pref'}).length;
+  var gaps={}; fb.filter(function(f){return f.status==='not-captured'||f.status==='not-set'}).forEach(function(f){gaps[f.category]=(gaps[f.category]||0)+1});
+  var gapList=Object.keys(gaps).sort(function(a,b){return gaps[b]-gaps[a]}).map(function(k){return '<span class="chip">'+k+' · '+gaps[k]+'</span>'}).join('');
+  var res='';
+  if(r){var cl=classify(r.category,c);
+    res='<div class="verdict '+(cl.avoidable?'bad':'warn')+'"><div class="t">'+(cl.avoidable?'Avoidable rejection':'New information')+'</div><div>'+esc(cl.note)+'</div></div>'
+    +'<div class="small muted">Keywords found: '+(r.detected.length?r.detected.join(', '):'none')+'</div>'
+    +'<div><label for="fbcat">Reason category (edit if wrong)</label><select id="fbcat" data-bind="fbcat">'+CATS.map(function(k){return '<option'+(k===r.category?' selected':'')+'>'+k+'</option>'}).join('')+'</select></div>'
+    +'<div class="row"><button class="primary" type="button" data-act="fbSave">Confirm and log</button></div>';}
+  var log=fb.slice().sort(function(a,b){return b.at-a.at}).slice(0,12).map(function(f){var avd=f.status==='stated-deal'||f.status==='stated-pref';
+    return '<tr><td>'+esc(f.text)+(f.demo?' <span class="small muted">(demo)</span>':'')+'</td><td>'+f.category+'</td><td><span class="badge '+(avd?'bad':'muted')+'">'+(avd?'Already stated':f.status==='not-set'?'Not set':'Not captured')+'</span></td></tr>'}).join('');
+  return '<div class="stack"><div class="grid two"><div class="card stack"><h2>Turn rejection feedback into a reason</h2>'+clientSelect('sel-client')
+  +'<div><label for="fbtext">Client feedback, as written</label><textarea id="fbtext" data-bind="fbText" placeholder="I didn\'t like the lifestyle because I prefer someone who does not smoke.">'+esc(ui.fbText)+'</textarea></div>'
+  +'<div class="row"><button class="primary" type="button" data-act="analyse">Extract reason</button><button type="button" data-act="example">Use example</button></div>'+res
+  +'<div class="small muted">Prototype uses transparent keyword rules, not an AI model. In production an LLM would read the free text and return these same fields, and the matchmaker would still confirm them.</div></div>'
+  +'<div class="card stack"><h2>What the log says</h2><div><span class="n" style="font-family:var(--font-display);font-size:28px;font-weight:700">'+(fb.length?Math.round(100*av/fb.length):0)+'%</span> <span class="muted">of logged rejections (demo data) were for something already stated.</span></div>'
+  +'<div class="small muted">Reasons clients give that the preference form cannot hold. These are the first fields to add:</div><div class="chips">'+(gapList||'<span class="muted">None yet</span>')+'</div></div></div>'
+  +'<div class="card stack"><h3>Feedback log</h3><div class="tablewrap"><table><thead><tr><th>Feedback</th><th>Category</th><th>Check</th></tr></thead><tbody>'+log+'</tbody></table></div></div></div>';
+};
+
+views.history=function(){
+  var h=state.history.slice().sort(function(a,b){return b.at-a.at});
+  var rows=h.map(function(x){return '<tr><td>'+fmt(x.at)+'</td><td>'+esc(x.clientName)+'</td><td>'+esc(x.candName)+'</td><td>'+badge(x.status)+'</td><td>'+DEC[x.decision]+'</td><td>'+esc(x.reason)+'</td></tr>'}).join('');
+  return '<div class="card stack"><h2>Activity history</h2><div class="tablewrap"><table style="min-width:760px"><thead><tr><th>When</th><th>Client</th><th>Candidate</th><th>Result</th><th>Decision</th><th>Reason</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="small muted">First four rows are demo data. Decisions you record appear here.</div></div>';
+};
+
+var TABS=[['overview','Overview'],['checker','Check profiles'],['clients','Client preferences'],['feedback','Rejection feedback'],['history','History']];
+function render(){
+  var app=document.getElementById('app');
+  app.innerHTML='<header class="top"><div class="brand"><h1>The Date Crew Profile Checker</h1><small>Catch avoidable mismatches before the email goes out. The matchmaker always decides.</small></div><div class="row"><span class="pill">Demo data · fictional people</span><button type="button" data-act="reset">Reset demo data</button></div></header>'
+   +'<nav aria-label="Sections">'+TABS.map(function(t){return '<a href="#'+t[0]+'"'+(t[0]===ui.view?' aria-current="page"':'')+'>'+t[1]+'</a>'}).join('')+'</nav>'
+   +views[ui.view]();
+}
+function route(){var h=location.hash.replace('#','');ui.view=views[h]?h:'overview';ui.pending=null;render()}
+window.addEventListener('hashchange',route);
+
+document.addEventListener('change',function(e){
+  var t=e.target, b=t.getAttribute&&t.getAttribute('data-bind'); if(!b)return;
+  if(b==='client'){ui.clientId=t.value;ui.pending=null;ui.draft=null;ui.fbResult=null;render()}
+  else if(b==='level'){ui.draft.prefs[t.getAttribute('data-k')]=ui.draft.prefs[t.getAttribute('data-k')]||{value:null};ui.draft.prefs[t.getAttribute('data-k')].level=t.value}
+  else if(b==='val'){setVal(t.getAttribute('data-k'),t.value)}
+  else if(b==='fbcat'){ui.fbResult.category=t.value;render()}
+  else if(b==='ack'){ui.ack=t.checked}
+});
+document.addEventListener('input',function(e){
+  var b=e.target.getAttribute&&e.target.getAttribute('data-bind');
+  if(b==='reason')ui.reason=e.target.value; else if(b==='fbText')ui.fbText=e.target.value;
+  else if(b==='val')setVal(e.target.getAttribute('data-k'),e.target.value);
+});
+function setVal(k,v){
+  var d=ui.draft.prefs;
+  function ensure(key,def){if(!d[key])d[key]={level:'off',value:def};return d[key]}
+  if(k==='location')ensure('location',[]).value=v.split(',').map(function(s){return s.trim()}).filter(Boolean);
+  else if(k==='ageMin'){var a=ensure('age',{min:25,max:35});a.value.min=Number(v)}
+  else if(k==='ageMax'){var a2=ensure('age',{min:25,max:35});a2.value.max=Number(v)}
+  else ensure(k,v).value=v;
+}
+document.addEventListener('click',function(e){
+  var t=e.target.closest('[data-act]'); if(!t)return; var a=t.getAttribute('data-act');
+  if(a==='pick'){ui.candId=t.getAttribute('data-id');ui.pending=null;ui.reason='';ui.ack=false;render()}
+  else if(a==='decide'){ui.pending=t.getAttribute('data-d');ui.reason='';ui.ack=false;render()}
+  else if(a==='cancel'){ui.pending=null;render()}
+  else if(a==='confirm'){
+    var c=client(), cd=cand(), res=evaluate(c,cd);
+    if(ui.reason.trim().length<3){toast('Add a reason before saving.');return}
+    if(res.status==='conflict'&&ui.pending==='approve'&&!ui.ack){toast('Tick the box to approve despite the conflict.');return}
+    state.history.push({id:'H'+Date.now(),at:Date.now(),clientId:c.id,clientName:c.name,candId:cd.id,candName:cd.name,status:res.status,decision:ui.pending,reason:ui.reason.trim()});
+    save(); ui.pending=null; ui.reason=''; ui.ack=false; toast('Decision recorded in history.'); render();
+  }
+  else if(a==='savePrefs'){
+    Object.keys(ui.draft.prefs).forEach(function(k){var p=ui.draft.prefs[k]; if(k==='age'&&p.value.min>p.value.max){var m=p.value.min;p.value.min=p.value.max;p.value.max=m}});
+    client().prefs=clone(ui.draft.prefs); save(); ui.draft=null; toast('Preferences saved.'); render();
+  }
+  else if(a==='revertPrefs'){ui.draft=null;render()}
+  else if(a==='analyse'){
+    if(ui.fbText.trim().length<3){toast('Type some feedback first.');return}
+    ui.fbResult=analyse(ui.fbText.trim()); render();
+  }
+  else if(a==='example'){ui.fbText="I didn't like the lifestyle because I prefer someone who does not smoke.";ui.fbResult=analyse(ui.fbText);render()}
+  else if(a==='fbSave'){
+    var cl=classify(ui.fbResult.category,client());
+    state.feedback.push({id:'F'+Date.now(),at:Date.now(),clientId:ui.clientId,text:ui.fbResult.text,category:ui.fbResult.category,status:cl.status});
+    save(); ui.fbText=''; ui.fbResult=null; toast('Reason confirmed and logged.'); render();
+  }
+  else if(a==='reset'){state=seed();ui.draft=null;ui.pending=null;ui.fbResult=null;ui.fbText='';save();toast('Demo data reset.');render()}
+});
+route();
+</script>
